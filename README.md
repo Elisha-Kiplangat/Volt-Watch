@@ -2,25 +2,9 @@
 
 Real-time power supply monitoring application with a React/Vite frontend, NestJS REST/WebSocket backend, PostgreSQL, and Prisma ORM.
 
-## Requirements
-
-- Node.js 20 or newer and npm
-- A PostgreSQL database
-- Network access to install npm dependencies
 
 No Docker, broker deployment, CI/CD, or device firmware is included.
 
-## Configure
-
-Copy `frontend/.env.example` to `frontend/.env.local` and `backend/.env.example` to `backend/.env`. Set a real PostgreSQL URL and unique JWT secrets in the backend environment. For Neon, use the direct connection URL for migrations; seeding uses `DIRECT_URL` when provided and otherwise falls back to `DATABASE_URL`. Do not commit environment files.
-
-For example, generate independent secrets with:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
-```
-
-Set `JWT_SECRET` and `JWT_REFRESH_SECRET` to separate generated values. To seed accounts, set `SEED_SUPER_ADMIN_EMAIL` / `SEED_SUPER_ADMIN_PASSWORD`, `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`, and `SEED_OPERATOR_EMAIL` / `SEED_OPERATOR_PASSWORD` in the backend environment; passwords must be 12-72 characters. Optional `*_NAME` variables customize account names. `SEED_ADMIN_INSTITUTION` and `SEED_OPERATOR_INSTITUTION` customize their institution; both default to `Example Institution`. The existing `INITIAL_ADMIN_EMAIL` / `INITIAL_ADMIN_PASSWORD` variables remain supported as a SUPER_ADMIN fallback. Public operator registration requires an institution and admin approval.
 
 ## Install and run
 
@@ -45,7 +29,6 @@ npm run dev
 
 The frontend is served by Vite (normally `http://localhost:5173`). Swagger UI is available at `http://localhost:3000/api/docs`.
 
-To create a migration during local schema development, use `npm run prisma:migrate` with PostgreSQL available. Demo device and telemetry seed data is created only when `DEMO_MODE=true`. It creates `ESP32-SIM-001`, stores source-labelled SIMULATED readings, and leaves connectivity OFFLINE and protection UNKNOWN. It does not represent live measurements or protection operation. Configured seed users are created independently of demo mode. Administrators may submit individual simulated readings through `POST /api/v1/telemetry/simulate`; the endpoint is disabled outside non-production demo mode.
 
 ## Structure
 
@@ -84,5 +67,3 @@ cd frontend
 npm run build
 npm run lint
 ```
-
-Database migrations and database-backed integration require a configured PostgreSQL database and should be applied with `npx prisma migrate deploy` before starting the updated backend.
