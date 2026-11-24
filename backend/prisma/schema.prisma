@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  OPERATOR
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ConnectivityStatus {
+  ONLINE
+  OFFLINE
+  UNKNOWN
+}
+
+enum ProtectionState {
+  STARTING
+  NORMAL
+  WARNING_UNDERVOLTAGE
+  WARNING_OVERVOLTAGE
+  TRIPPED_UNDERVOLTAGE
+  TRIPPED_OVERVOLTAGE
+  TRIPPED_POWER_FAILURE
+  TRIPPED_TRANSIENT
+  RECOVERY_PENDING
+  UNKNOWN
+}
+
+enum EventType {
+  UNDERVOLTAGE
+  OVERVOLTAGE
+  TRANSIENT_SURGE
+  POWER_FAILURE
+  PROTECTION_TRIP
+  PROTECTION_RECOVERY
+  DEVICE_CONNECTED
+  DEVICE_DISCONNECTED
+  SYSTEM_WARNING
+}
+
+enum Severity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+enum MeasurementSource {
+  DEVICE
+  SIMULATED
+}
+
+enum ConfigurationDeliveryStatus {
+  PENDING
+  DELIVERED
+  ACKNOWLEDGED
+  FAILED
+}
+
+model User {
+  id             String         @id @default(cuid())
+  fullName       String
+  email          String         @unique
+  password       String
+  role           UserRole       @default(OPERATOR)
+  approvalStatus ApprovalStatus @default(APPROVED)
+  institutionId  String?
+  isActive       Boolean        @default(true)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  institution    Institution?   @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  refreshTokens  RefreshToken[]
+  acknowledged   Alert[]        @relation("AlertAcknowledgedBy")
+  assignedAlerts Alert[]        @relation("AlertAssignedTo")
+  notifications  Notification[]
+  activityLogs   ActivityLog[]
+  reports        Report[]
+
+  @@index([institutionId, role, approvalStatus])
+}
+
+model Institution {
+  id             String   @id @default(cuid())
+  name           String
+  normalizedName String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  users          User[]
+  devices        Device[]
+  reports        Report[]
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model Device {
+  id                 String               @id @default(cuid())
+  deviceId           String               @unique
+  name               String
+  description        String?
+  location           String?
+  deviceType         String               @default("SURGE_PROTECTOR")
+  firmwareVersion    String?
+  ipAddress          String?
+  institutionId      String?
+  connectivityStatus ConnectivityStatus   @default(UNKNOWN)
+  protectionState    ProtectionState      @default(UNKNOWN)
+  lastSeenAt         DateTime?
+  isActive           Boolean              @default(true)
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  readings           SensorReading[]
+  events             SurgeEvent[]
+  alerts             Alert[]
+  protectionLogs     ProtectionLog[]
+  configuration      DeviceConfiguration?
+  reports            Report[]
+  institution        Institution?         @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+
+  @@index([institutionId, updatedAt(sort: Desc)])
+  @@index([connectivityStatus, isActive])
+  @@index([protectionState])
+  @@index([lastSeenAt])
+}
+
+model SensorReading {
+  id         String            @id @default(cuid())
+  deviceId   String
+  voltage    Decimal           @db.Decimal(8, 3)
+  current    Decimal?          @db.Decimal(8, 3)
+  frequency  Decimal?          @db.Decimal(7, 3)
+  power      Decimal?          @db.Decimal(10, 3)
+  source     MeasurementSource @default(DEVICE)
+  recordedAt DateTime
+  device     Device            @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt(sort: Desc)])
+  @@index([recordedAt])
+}
+
+model SurgeEvent {
+  id               String    @id @default(cuid())
+  externalId       String?
+  deduplicationKey String?
+  deviceId         String
+  eventType        EventType
+  severity         Severity
+  description      String
+  voltage          Decimal?  @db.Decimal(8, 3)
+  eventTimestamp   DateTime
+  createdAt        DateTime  @default(now())
+  device           Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  alert            Alert?
+
+  @@unique([deviceId, externalId])
+  @@unique([deviceId, deduplicationKey])
+  @@index([eventTimestamp(sort: Desc)])
+  @@index([deviceId, eventType, eventTimestamp])
+}
+
+model Alert {
+  id               String      @id @default(cuid())
+  deviceId         String
+  eventId          String?     @unique
+  title            String
+  message          String
+  severity         Severity
+  status           AlertStatus @default(ACTIVE)
+  acknowledgedById String?
+  assignedToId     String?
+  acknowledgedAt   DateTime?
+  resolvedAt       DateTime?
+  createdAt        DateTime    @default(now())
+  device           Device      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  event            SurgeEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  acknowledgedBy   User?       @relation("AlertAcknowledgedBy", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  assignedTo       User?       @relation("AlertAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([status, severity, createdAt(sort: Desc)])
+  @@index([deviceId, status])
+}
+
+model ProtectionLog {
+  id                String          @id @default(cuid())
+  deviceId          String
+  previousState     ProtectionState
+  currentState      ProtectionState
+  tripReason        String?
+  voltage           Decimal?        @db.Decimal(8, 3)
+  contactorCommand  Boolean?
+  contactorFeedback Boolean?
+  recordedAt        DateTime        @default(now())
+  device            Device          @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@index([deviceId, recordedAt(sort: Desc)])
+}
+
+model DeviceConfiguration {
+  id                           String                      @id @default(cuid())
+  deviceId                     String                      @unique
+  lowVoltageThreshold          Decimal                     @default(210) @db.Decimal(8, 3)
+  criticalLowVoltageThreshold  Decimal                     @default(180) @db.Decimal(8, 3)
+  highVoltageThreshold         Decimal                     @default(250) @db.Decimal(8, 3)
+  criticalHighVoltageThreshold Decimal                     @default(270) @db.Decimal(8, 3)
+  recoveryStableDuration       Int                         @default(30)
+  version                      Int                         @default(1)
+  deliveryStatus               ConfigurationDeliveryStatus @default(PENDING)
+  acknowledgedAt               DateTime?
+  createdAt                    DateTime                    @default(now())
+  updatedAt                    DateTime                    @updatedAt
+  device                       Device                      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt(sort: Desc)])
+}
+
+model ActivityLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  action     String
+  entityType String
+  entityId   String?
+  details    Json?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+model Report {
+  id            String       @id @default(cuid())
+  title         String
+  reportType    ReportType
+  deviceId      String?
+  institutionId String?
+  requestedById String
+  periodFrom    DateTime
+  periodTo      DateTime
+  summary       Json
+  createdAt     DateTime     @default(now())
+  device        Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  institution   Institution? @relation(fields: [institutionId], references: [id], onDelete: SetNull)
+  requestedBy   User         @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([institutionId, createdAt(sort: Desc)])
+  @@index([reportType, createdAt(sort: Desc)])
+  @@index([deviceId, periodFrom, periodTo])
+  @@index([requestedById, createdAt(sort: Desc)])
+}
+
+enum ReportType {
+  ELECTRICAL_MONITORING
+  VOLTAGE_ANOMALY
+  SURGE_EVENT
+  PROTECTION_TRIP
+  DEVICE_PERFORMANCE
+  ALERT_SUMMARY
+}
