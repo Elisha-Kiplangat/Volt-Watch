@@ -31,7 +31,7 @@ const roleViews: Record<AuthUser['role'], { title: string; description: string; 
     access: 'Administrator access: institution-scoped monitoring, operator approvals, and device configuration management.',
   },
   SUPER_ADMIN: {
-    title: 'System administration dashboard',
+    title: 'System admin dashboard',
     description: 'Monitor all institutions, approve operator accounts, and oversee administrator and institution access.',
     access: 'Super administrator access: cross-institution monitoring, administrator creation, and user access.',
   },
@@ -52,7 +52,7 @@ function RecentEventRow({ event }: { event: RecentEvent }) {
 
 export function DashboardPage() {
   const { user } = useAuth()
-  const { data: summary, isPending, isError, error, refetch } = useDashboard()
+  const { data: summary, isPending, isFetching, isError, error, refetch } = useDashboard()
   const [realtime, setRealtime] = useState(false)
   const roleView = roleViews[user?.role ?? 'OPERATOR']
 
@@ -71,17 +71,17 @@ export function DashboardPage() {
   return <>
     <header className="page-heading">
       <div><div className="eyebrow">POWER SYSTEMS / {user?.role.replaceAll('_', ' ')}</div><h1>{roleView.title}</h1><p className="subheading">{roleView.description}</p></div>
-      <button className="button button-secondary" onClick={() => void refetch()} disabled={isPending}><RefreshCw size={16} className={isPending ? 'spin' : ''} /> Refresh</button>
+      <button type="button" className="button button-secondary" onClick={() => void refetch()} aria-busy={isFetching}><RefreshCw size={16} className={isFetching ? 'spin' : ''} /> {isFetching ? 'Refreshing...' : 'Refresh'}</button>
     </header>
 
-    <section className="panel role-access-panel"><div><strong>{roleView.access}</strong><p>Actions unavailable to your role are restricted by the API.</p></div>
+    <section className="panel role-access-panel"><div><strong>{roleView.access}</strong><p>Actions unavailable to you.</p></div>
       {user?.role === 'SUPER_ADMIN' && <Link className="text-link" to="/users">View users <span>→</span></Link>}
       {user?.role === 'ADMIN' && <Link className="text-link" to="/devices">Manage devices <span>→</span></Link>}
       {(user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') && <Link className="text-link" to="/approvals">Operator approvals <span>→</span></Link>}
       {user?.role === 'OPERATOR' && <Link className="text-link" to="/alerts">Review alerts <span>→</span></Link>}
     </section>
 
-    {isError && <div className="error-banner" role="alert"><WifiOff size={18} /><span>{error instanceof Error ? error.message : 'The monitoring API could not be reached. Dashboard values are not available.'}</span><button onClick={() => void refetch()}>Retry</button></div>}
+    {isError && <div className="error-banner" role="alert"><WifiOff size={18} /><span>{error instanceof Error ? error.message : 'The monitoring API could not be reached. Dashboard values are not available.'}</span><button type="button" onClick={() => void refetch()} aria-busy={isFetching}>{isFetching ? 'Retrying...' : 'Retry'}</button></div>}
 
     <section className="summary-grid" aria-label="System summary">
       {metricCards.map(({ title, key, icon, tone, note }) => <MetricCard key={key} title={title} value={summary?.[key]} loading={isPending} tone={tone} icon={icon} note={note(summary ?? { onlineDevices: 0 })} />)}
