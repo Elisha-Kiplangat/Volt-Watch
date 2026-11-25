@@ -16,8 +16,8 @@ export function VoltageTrendChart({ points, loading, realtime }: { points: Volta
       <AreaChart data={points} margin={{ top: 10, right: 12, bottom: 0, left: -16 }}>
         <defs><linearGradient id="voltageFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#60C1E5" stopOpacity={0.28} /><stop offset="96%" stopColor="#60C1E5" stopOpacity={0.015} /></linearGradient></defs>
         <CartesianGrid stroke="#E8EDF1" vertical={false} />
-        <XAxis dataKey="recordedAt" tickFormatter={formatTime} tickLine={false} axisLine={false} tick={{ fill: '#778491', fontSize: 11 }} minTickGap={32} />
-        <YAxis domain={[160, 280]} ticks={[180, 210, 240, 270]} tickLine={false} axisLine={false} tick={{ fill: '#778491', fontSize: 11 }} />
+        <XAxis dataKey="recordedAt" tickFormatter={formatTime} tickLine={false} axisLine={false} tick={{ fill: '#778491', fontSize: 12 }} minTickGap={32} />
+        <YAxis domain={[160, 280]} ticks={[180, 210, 240, 270]} tickLine={false} axisLine={false} tick={{ fill: '#778491', fontSize: 12 }} />
         <Tooltip labelFormatter={(label) => new Date(label).toLocaleString()} formatter={(entry: number, name: string) => [`${entry.toFixed(1)} V`, name]} />
         <Area type="monotone" dataKey="voltageDevice" name="REAL" stroke="#005A9C" strokeWidth={2} fill="url(#voltageFill)" dot={false} activeDot={{ r: 4, fill: '#005A9C' }} connectNulls />
         <Area type="monotone" dataKey="voltageSimulated" name="SIMULATED" stroke="#d9972f" strokeWidth={1.7} strokeDasharray="5 4" fill="none" dot={false} connectNulls />
